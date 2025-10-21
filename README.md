@@ -47,8 +47,8 @@ The script will walk you through each setting step by step.
 
 ## How It Works
 
-### 1. MP4 Creation
-- The video is encoded to MP4 using `hevc_videotoolbox`.  
+### 1. MKV Creation
+- The video is encoded to MKV using `hevc_videotoolbox`.  
 - Audio tracks are either passed through or converted based on your settings.  
 - Missing tracks are automatically generated if needed.
 
