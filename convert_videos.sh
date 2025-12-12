@@ -56,14 +56,13 @@ function ReadBitDepthResolutionSettings() {
   read BITDEPTH
   [[ -z "$BITDEPTH" ]] && BITDEPTH="8bit"
   
+  TONE_MAPPING_FILTER=""
+  TONE_MAPPING_PARAMETERS=""
+
   if [[ "$BITDEPTH" == "10" || "$BITDEPTH" == "10bit" ]]; then
-      TONE_MAPPING_FILTER=""
-      TONE_MAPPING_PARAMETERS=""
       PIXEL_FORMAT="yuv420p10le"
       PROFILE="main10"
   else
-      TONE_MAPPING_FILTER=",format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p"
-      TONE_MAPPING_PARAMETERS="-color_primaries bt709 -color_trc bt709 -colorspace bt709"
       PIXEL_FORMAT="yuv420p"
       PROFILE="main"
   fi  
@@ -177,7 +176,7 @@ function RunFFMPeg() {
   video_output_file=$3
 
   ffmpeg -hide_banner -y -i "$video_file" \
-    -vf "scale=${RESOLUTION},zscale=t=linear:npl=100${TONE_MAPPING_FILTER}" \
+    -vf "scale=${RESOLUTION}" \
     -map 0:v:0 -c:v hevc_videotoolbox -profile:v $PROFILE -pix_fmt $PIXEL_FORMAT -q:v $QUALITY  \
     $([ -n "$FPS" ] && echo "-r $FPS") \
     ${TONE_MAPPING_PARAMETERS} \
