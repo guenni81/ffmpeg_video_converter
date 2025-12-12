@@ -3,7 +3,7 @@
 # Mac mini M4/Pro FFmpeg Converting tool
 # =====================================
 
-shopt -s globstar nullglob
+
 
 function ReadSettingsFromUser() {
     ReadInputDirectorySettings
@@ -195,7 +195,7 @@ function RunFFMPeg() {
 
 function ProcessMovieFiles() {
 # --- Processing ---
-  for INPUT_FILE in "$INPUT_DIR"/**/*.{mp4,mkv}; do
+  find "$INPUT_DIR" \( -name "*.mp4" -o -name "*.mkv" \) -print0 | while IFS= read -r -d $'\0' INPUT_FILE; do
     [ -f "$INPUT_FILE" ] || continue
 
     BASE="$(basename "$INPUT_FILE")"
