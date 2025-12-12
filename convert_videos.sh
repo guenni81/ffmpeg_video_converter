@@ -56,9 +56,6 @@ function ReadBitDepthResolutionSettings() {
   read BITDEPTH
   [[ -z "$BITDEPTH" ]] && BITDEPTH="8bit"
   
-  TONE_MAPPING_FILTER=""
-  TONE_MAPPING_PARAMETERS=""
-
   if [[ "$BITDEPTH" == "10" || "$BITDEPTH" == "10bit" ]]; then
       PIXEL_FORMAT="yuv420p10le"
       PROFILE="main10"
@@ -131,25 +128,34 @@ function MapAudioCodec() {
 }
 
 function MapSubtitles() {
-  local video_file
-  local subtitles_count
+  local video_file="$1"
   SUBTITLES_MAP=()
   SUBTITLES_PARAMETER=()
   
-  video_file=$1
-  subtitles_count=$(ffprobe -loglevel error -select_streams s -show_entries stream=index:stream_tags=language -of csv=p=0 "$video_file" | wc -l)
+  local subtitles_count
+  subtitles_count=$(ffprobe -v error -select_streams s -show_entries stream=index -of csv=p=0 "$video_file" | wc -l)
   
-  for i in $(seq 0 $((subtitles_count-1))); do
-    lang=$(ffprobe -v error -select_streams s:$i -show_entries stream_tags=language -of csv=p=0 "$video_file")
-    for l in "${LANGUAGES[@]}"; do
-      if [[ "$lang" == "$l" ]]; then
-        SUBTITLES_MAP+=("-map" "0:s:$i")
-      fi
-    done
-  done
-  
+  if [ "$subtitles_count" -gt 0 ]; then
+    local audio_info
+    audio_info=$(ffprobe -v error -select_streams s -show_entries stream=index:stream_tags=language -of csv=p=0 "$video_file")
+    
+    while IFS=, read -r index lang; do
+        local lang_clean=$(echo "$lang" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+        for l in "${LANGUAGES[@]}"; do
+            local l_lower=$(echo "$l" | tr '[:upper:]' '[:lower:]')
+            if [[ "$lang_clean" == "$l_lower" ]]; then
+                SUBTITLES_MAP+=("-map" "0:$index")
+                break
+            fi
+        done
+    done <<< "$audio_info"
+  fi
+
   if [ ${#SUBTITLES_MAP[@]} -gt 0 ]; then
     SUBTITLES_PARAMETER+=("-c:s" "copy")
+  else
+    # No subtitles found or matched, so explicitly disable subtitle processing.
+    SUBTITLES_PARAMETER+=("-sn")
   fi
 }
 
@@ -175,12 +181,13 @@ function RunFFMPeg() {
   video_temp_file=$2
   video_output_file=$3
 
-  ffmpeg -hide_banner -y -i "$video_file" \
+  ffmpeg -hide_banner -y -nostdin -i "$video_file" \
+    -t 30 \
     -vf "scale=${RESOLUTION}" \
-    -map 0:v:0 -c:v hevc_videotoolbox -profile:v $PROFILE -pix_fmt $PIXEL_FORMAT -q:v $QUALITY  \
+    -map 0:v:0 -c:v hevc_videotoolbox -profile:v $PROFILE -pix_fmt $PIXEL_FORMAT -q:v $QUALITY \
     $([ -n "$FPS" ] && echo "-r $FPS") \
-    ${TONE_MAPPING_PARAMETERS} \
-    "${AUDIO_MAP[@]}" "${AUDIO_CODEC[@]}" "${SUBTITLES_MAP[@]}" "${SUBTITLES_PARAMETER[@]}"  \
+    "${AUDIO_MAP[@]}" "${AUDIO_CODEC[@]}" \
+    "${SUBTITLES_MAP[@]}" "${SUBTITLES_PARAMETER[@]}" \
     -tag:v hev1 \
     "$video_temp_file"
     
